@@ -5,6 +5,6 @@
 // NEVER put the service_role key here.
 // While both are empty the CRM runs in local mode (data saved in this browser only).
 window.CRM_CONFIG = {
-  SUPABASE_URL: '',
+  SUPABASE_URL: 'https://crcdvghkyointygnmsyp.supabase.co',
   SUPABASE_ANON_KEY: ''
 };
