@@ -94,7 +94,13 @@
         snapshot.set(s.id, json);
         idsChanged = true;
       } else if (snapshot.get(s.id) !== json) {
-        const { error } = await client.from('schools').update(body).eq('id', s.id);
+        // Send only the fields that changed, so parallel edits to other fields are not overwritten
+        const before = JSON.parse(snapshot.get(s.id));
+        const changes = {};
+        FIELDS.forEach((f) => {
+          if (JSON.stringify(before[f]) !== JSON.stringify(body[f])) changes[f] = body[f];
+        });
+        const { error } = await client.from('schools').update(changes).eq('id', s.id);
         if (error) { onError('تعذر حفظ التعديل: ' + error.message); continue; }
         snapshot.set(s.id, json);
       }
