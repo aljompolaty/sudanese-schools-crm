@@ -1,12 +1,14 @@
 // Supabase Edge Function: send-campaign-email
-// Sends personalised campaign emails through Brevo, then logs each one in the CRM.
+// Sends personalised campaign emails from your Gmail (via the Apps Script in gmail-sender/Code.gs)
+// or through Brevo, then logs each sent email in the CRM.
 //
 // Deploy: Supabase Dashboard → Edge Functions → Deploy a new function → Via Editor
 //         name: send-campaign-email → paste this file → Deploy
-// Secrets (Edge Functions → Secrets):
-//   BREVO_API_KEY  — Brevo → SMTP & API → API Keys
-//   SENDER_EMAIL   — a sender address verified in Brevo (Senders, Domains & Dedicated IPs)
-//   SENDER_NAME    — e.g. Experience Media
+// Secrets (Edge Functions → Secrets) — Gmail (recommended):
+//   GMAIL_SCRIPT_URL     — the Apps Script "Web app" URL
+//   GMAIL_SCRIPT_SECRET  — the secret printed by setup() in the Apps Script
+//   SENDER_NAME          — e.g. Experience Media
+// …or Brevo instead: BREVO_API_KEY, SENDER_EMAIL, SENDER_NAME
 //
 // Request body: { campaign_id: number|null, messages: [{ school_id, subject, text }], video?: { url, thumb } }
 // Recipient addresses are read from the database, never from the request.
