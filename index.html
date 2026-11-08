@@ -9,6 +9,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="config.js"></script>
   <script src="crm-db.js"></script>
+  <script src="crm-phase2.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body {
@@ -79,6 +80,15 @@
         <span>🗂️</span>
         <span>قاعدة البيانات والتواصل المباشر (49)</span>
       </button>
+      <button data-tab="tab-followups" id="navFollowups" class="hidden nav-tab-btn px-4 py-3 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
+        <span>⏰</span>
+        <span>المتابعات</span>
+        <span id="followupsBadge" class="hidden px-2 py-0.5 text-xs rounded-full bg-rose-500/25 text-rose-200 font-bold">0</span>
+      </button>
+      <button data-tab="tab-pipeline" class="nav-tab-btn px-4 py-3 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
+        <span>🧭</span>
+        <span>مراحل البيع</span>
+      </button>
       <button data-tab="tab-campaigns" class="nav-tab-btn px-4 py-3 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
         <span>💬</span>
         <span>استوديو رسائل الواتساب والإيميل</span>
@@ -91,6 +101,10 @@
       <button data-tab="tab-strategy" class="nav-tab-btn px-4 py-3 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
         <span>💡</span>
         <span>مقترحات وأفكار تطوير العمل</span>
+      </button>
+      <button data-tab="tab-audit" id="navAudit" class="hidden nav-tab-btn px-4 py-3 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
+        <span>🛡️</span>
+        <span>سجل التعديلات</span>
       </button>
     </div>
   </header>
@@ -254,7 +268,101 @@
     </section>
 
     <!-- TAB 2: CAMPAIGN STUDIO (WHATSAPP & EMAIL) -->
+    <!-- TAB: FOLLOW-UPS (cloud) -->
+    <section id="tab-followups" class="tab-panel hidden space-y-4">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-slate-900">⏰ المتابعات المطلوبة</h2>
+            <p class="text-xs text-slate-500">مواعيد المتابعة المسجلة في سجل التواصل لكل مدرسة: المتأخرة، واليوم، والأيام السبعة القادمة</p>
+          </div>
+          <button type="button" id="btnRefreshFollowups" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">🔄 تحديث</button>
+        </div>
+        <div id="followupsContainer" class="space-y-5 text-xs sm:text-sm"></div>
+      </div>
+    </section>
+
+    <!-- TAB: SALES PIPELINE (Kanban) -->
+    <section id="tab-pipeline" class="tab-panel hidden space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-slate-900">🧭 لوحة مراحل البيع</h2>
+          <p class="text-xs text-slate-500">اسحب بطاقة المدرسة إلى المرحلة الجديدة، أو غيّر المرحلة من القائمة داخل البطاقة. الضغط على الاسم يفتح ملف المدرسة.</p>
+        </div>
+        <input id="pipelineSearch" type="search" placeholder="بحث باسم المدرسة أو المنطقة..." class="w-full sm:w-64 rounded-lg border border-slate-300 px-3 py-2 text-xs sm:text-sm bg-white focus:border-emerald-500 focus:outline-none">
+      </div>
+      <div id="pipelineBoard" class="flex gap-3 overflow-x-auto pb-3 snap-x"></div>
+    </section>
+
+    <!-- TAB: AUDIT LOG (admin, cloud) -->
+    <section id="tab-audit" class="tab-panel hidden space-y-4">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-slate-900">🛡️ سجل التعديلات</h2>
+            <p class="text-xs text-slate-500">آخر 200 تعديل على المدارس والسجلات والحملات: من قام به، ومتى، وما الذي تغيّر (يظهر للمدير فقط)</p>
+          </div>
+          <button type="button" id="btnRefreshAudit" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">🔄 تحديث</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-right border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                <th class="py-2 px-2 font-bold whitespace-nowrap">الوقت</th>
+                <th class="py-2 px-2 font-bold">المستخدم</th>
+                <th class="py-2 px-2 font-bold">العملية</th>
+                <th class="py-2 px-2 font-bold">المدرسة</th>
+                <th class="py-2 px-2 font-bold">التفاصيل</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section id="tab-campaigns" class="tab-panel hidden space-y-6">
+      <!-- Campaign manager (cloud) -->
+      <div id="campaignManager" class="hidden bg-white rounded-xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-slate-900">📣 إدارة الحملات</h2>
+            <p class="text-xs text-slate-500">احفظ المدارس المحددة كحملة، ثم تابع حالة كل مدرسة فيها. الإرسال من قائمة الإرسال أدناه يحدّث الحالة تلقائياً إلى «أُرسلت».</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs sm:text-sm">
+          <div class="flex flex-wrap items-center gap-2">
+            <label for="activeCampaignSelect" class="font-bold text-slate-700">الحملة النشطة:</label>
+            <select id="activeCampaignSelect" class="flex-1 min-w-[12rem] rounded-lg border border-slate-300 px-2 py-2 bg-white"></select>
+            <button type="button" id="btnArchiveCampaign" class="hidden px-3 py-2 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 text-xs font-semibold">🗄️ أرشفة</button>
+          </div>
+          <form id="newCampaignForm" class="flex flex-wrap items-center gap-2">
+            <input id="newCampaignName" type="text" required placeholder="اسم الحملة الجديدة (مثال: حملة نوفمبر — المدارس المعتمدة)" class="flex-1 min-w-[12rem] rounded-lg border border-slate-300 px-3 py-2">
+            <select id="newCampaignChannel" aria-label="قناة الحملة" class="rounded-lg border border-slate-300 px-2 py-2 bg-white">
+              <option value="whatsapp">💬 واتساب</option>
+              <option value="email">✉️ بريد</option>
+              <option value="mixed">🔀 مختلطة</option>
+            </select>
+            <button type="submit" id="btnCreateCampaign" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold">➕ حفظ المحددة كحملة (<span id="newCampaignCount">0</span>)</button>
+          </form>
+        </div>
+        <div id="campaignStats" class="flex flex-wrap gap-2 text-xs"></div>
+        <div id="campaignTargetsWrap" class="hidden overflow-x-auto max-h-[420px] overflow-y-auto border border-slate-200 rounded-xl">
+          <table class="w-full text-right border-collapse text-xs sm:text-sm">
+            <thead class="sticky top-0 bg-slate-50">
+              <tr class="text-slate-600 border-b border-slate-200">
+                <th class="py-2 px-3 font-bold">المدرسة</th>
+                <th class="py-2 px-3 font-bold">المنطقة</th>
+                <th class="py-2 px-3 font-bold">حالة الحملة</th>
+                <th class="py-2 px-3 font-bold whitespace-nowrap">أُرسلت</th>
+                <th class="py-2 px-3 font-bold whitespace-nowrap">الرد</th>
+              </tr>
+            </thead>
+            <tbody id="campaignTargetsBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <!-- Left/Right Column: Template Editor -->
         <div class="lg:col-span-7 bg-white rounded-xl shadow-sm border border-slate-200/80 p-5 space-y-4">
@@ -1975,6 +2083,7 @@ https://aljompolaty.github.io/science-grade9-game/
       updateKPIs();
       renderCampaignQueue();
       updateCharts();
+      if (typeof window.renderPipeline === 'function') window.renderPipeline();
     }
 
     // RENDER CAMPAIGN QUEUE & LIVE PREVIEW
@@ -2020,6 +2129,7 @@ https://aljompolaty.github.io/science-grade9-game/
               <span>📍 ${escapeHtml(school.zone)}</span>
               <span>•</span>
               <span class="font-semibold">${escapeHtml(school.status)}</span>
+              ${typeof window.campaignBadgeFor === 'function' ? window.campaignBadgeFor(school.id) : ''}
             </div>
           </div>
           <div class="flex items-center gap-1.5">
@@ -2234,8 +2344,10 @@ https://aljompolaty.github.io/science-grade9-game/
         list.innerHTML = rows.map(r => {
           const when = new Date(r.created_at).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
           const dir = r.direction === 'in' ? ' • وارد' : (r.direction === 'out' ? ' • صادر' : '');
-          const follow = r.next_follow_up
-            ? `<div class="mt-1 text-amber-700 font-semibold">⏰ متابعة: ${escapeHtml(r.next_follow_up)}</div>` : '';
+          const follow = !r.next_follow_up ? '' : (r.follow_up_done
+            ? `<div class="mt-1 text-emerald-700 font-semibold">✅ تمت المتابعة (${escapeHtml(r.next_follow_up)})${r.follow_up_done_by ? ' — <span class="font-mono" dir="ltr">' + escapeHtml(r.follow_up_done_by) + '</span>' : ''}</div>`
+            : `<div class="mt-1 flex flex-wrap items-center gap-2 text-amber-700 font-semibold">⏰ متابعة: ${escapeHtml(r.next_follow_up)}
+                 <button type="button" data-fu-done="${Number(r.id)}" class="px-2 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px]">✔ تمت</button></div>`);
           const outcome = r.outcome ? `<div class="mt-1 text-slate-600">النتيجة: ${escapeHtml(r.outcome)}</div>` : '';
           const isStatus = r.type === 'status_change';
           return `<div class="rounded-lg border ${isStatus ? 'border-slate-200 bg-slate-50' : 'border-indigo-100 bg-white'} p-2.5">
@@ -2264,6 +2376,8 @@ https://aljompolaty.github.io/science-grade9-game/
           try {
             const members = await CRMDB.checkMembership();
             if (members) {
+              const myEmail = String(session.user.email || '').toLowerCase();
+              CRMDB.me = members.find(m => m.email === myEmail) || { email: myEmail, role: 'marketer' };
               overlay.classList.add('hidden');
               overlay.classList.remove('flex');
               return session;
@@ -2434,6 +2548,7 @@ https://aljompolaty.github.io/science-grade9-game/
             renderCRM();
           }
           if (CLOUD) CRMDB.logInteraction({ school_id: school.id, type: 'whatsapp', direction: 'out', summary: 'فتح محادثة واتساب برسالة الحملة الترويجية' });
+          if (typeof window.onCampaignContact === 'function') window.onCampaignContact(school.id);
           showToast(`تم فتح محادثة واتساب لـ ${school.name} وتحديث حالتها`, '💬');
         } else if (action === 'email') {
           const sub = buildPersonalizedSubject(school);
@@ -2446,6 +2561,7 @@ https://aljompolaty.github.io/science-grade9-game/
             renderCRM();
           }
           if (CLOUD) CRMDB.logInteraction({ school_id: school.id, type: 'email', direction: 'out', summary: 'تجهيز بريد إلكتروني برسالة الحملة الترويجية' });
+          if (typeof window.onCampaignContact === 'function') window.onCampaignContact(school.id);
           showToast(`تم تجهيز البريد الإلكتروني لـ ${school.name}`, '✉️');
         } else if (action === 'copy-msg') {
           const msg = buildPersonalizedMessage(school);
@@ -2568,6 +2684,7 @@ https://aljompolaty.github.io/science-grade9-game/
           });
           document.getElementById('interactionForm').reset();
           await loadInteractions(schoolId);
+          if (typeof window.refreshFollowUps === 'function') window.refreshFollowUps();
           showToast('تمت إضافة السجل', '🗒️');
         } catch (err) {
           showToast('تعذر إضافة السجل: ' + err.message, '⚠️');
