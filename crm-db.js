@@ -145,8 +145,102 @@
     return queue;
   }
 
+  // ---------- Follow-ups ----------
+  // Open follow-ups due on or before `untilDate` (YYYY-MM-DD)
+  async function listFollowUps(untilDate) {
+    const { data, error } = await client
+      .from('interactions')
+      .select('id, school_id, type, summary, outcome, next_follow_up, created_by, created_at')
+      .not('next_follow_up', 'is', null)
+      .eq('follow_up_done', false)
+      .lte('next_follow_up', untilDate)
+      .order('next_follow_up', { ascending: true })
+      .limit(500);
+    if (error) throw error;
+    return data;
+  }
+
+  async function completeFollowUp(id, done = true) {
+    const { error } = await client.rpc('complete_follow_up', { p_id: id, p_done: done });
+    if (error) throw error;
+  }
+
+  // ---------- Campaigns ----------
+  async function listCampaigns() {
+    const { data, error } = await client
+      .from('campaigns')
+      .select('id, name, channel, subject, body, archived, created_at, created_by, campaign_targets(status)')
+      .eq('archived', false)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map((c) => {
+      const counts = { total: 0, pending: 0, sent: 0, replied: 0, interested: 0, not_interested: 0 };
+      (c.campaign_targets || []).forEach((t) => { counts.total++; counts[t.status] = (counts[t.status] || 0) + 1; });
+      const { campaign_targets, ...rest } = c;
+      return { ...rest, counts };
+    });
+  }
+
+  async function createCampaign({ name, channel, subject, body, schoolIds }) {
+    const { data, error } = await client
+      .from('campaigns')
+      .insert({ name, channel: channel || 'whatsapp', subject: subject || null, body: body || null })
+      .select('id')
+      .single();
+    if (error) throw error;
+    if (schoolIds && schoolIds.length) {
+      const rows = schoolIds.map((sid) => ({ campaign_id: data.id, school_id: sid }));
+      const { error: e2 } = await client.from('campaign_targets').insert(rows);
+      if (e2) throw e2;
+    }
+    return Number(data.id);
+  }
+
+  async function archiveCampaign(id) {
+    const { error } = await client.from('campaigns').update({ archived: true }).eq('id', id);
+    if (error) throw error;
+  }
+
+  async function listCampaignTargets(campaignId) {
+    const { data, error } = await client
+      .from('campaign_targets')
+      .select('school_id, status, sent_at, replied_at, updated_by, updated_at')
+      .eq('campaign_id', campaignId);
+    if (error) throw error;
+    return data;
+  }
+
+  async function setTargetStatus(campaignId, schoolId, status) {
+    const { error } = await client
+      .from('campaign_targets')
+      .update({ status })
+      .eq('campaign_id', campaignId)
+      .eq('school_id', schoolId);
+    if (error) throw error;
+  }
+
+  // ---------- Audit log (admins only; RLS returns nothing to others) ----------
+  async function listAudit(limit = 200) {
+    const { data, error } = await client
+      .from('audit_log')
+      .select('id, table_name, row_id, action, old_data, new_data, changed_by, changed_at')
+      .order('changed_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data;
+  }
+
   window.CRMDB = {
     enabled,
+    me: null, // { email, role } — set after sign-in
+    listFollowUps,
+    completeFollowUp,
+    listCampaigns,
+    createCampaign,
+    archiveCampaign,
+    listCampaignTargets,
+    setTargetStatus,
+    listAudit,
     getSession,
     signIn,
     signOut,
