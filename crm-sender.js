@@ -205,7 +205,7 @@
       }
     } finally {
       btn.disabled = false;
-      btn.innerHTML = label;
+      btn.classList.remove('opacity-60', 'animate-pulse');
       window.updateBulkCounts();
     }
   }
