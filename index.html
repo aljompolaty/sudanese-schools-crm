@@ -2325,6 +2325,18 @@ https://aljompolaty.github.io/science-grade9-game/
       modal.classList.remove('flex');
     }
 
+    // Preview "send via WhatsApp" goes through the same path as the table's WhatsApp button
+    function openQuickWhatsapp(schoolId) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('data-action', 'wa');
+      b.setAttribute('data-id', String(schoolId));
+      b.className = 'hidden';
+      document.body.appendChild(b);
+      b.click();
+      b.remove();
+    }
+
     // INTERACTIONS TIMELINE (cloud mode)
     const INTERACTION_TYPES = {
       note: '📝 ملاحظة', call: '📞 مكالمة', whatsapp: '💬 واتساب', email: '✉️ بريد',
@@ -2468,6 +2480,7 @@ https://aljompolaty.github.io/science-grade9-game/
       }
 
       renderCRM();
+      if (typeof window.onCrmReady === 'function') window.onCrmReady();
 
       // Tab Navigation
       document.querySelectorAll('.nav-tab-btn').forEach(btn => {
@@ -2663,6 +2676,22 @@ https://aljompolaty.github.io/science-grade9-game/
         saveState();
         renderCRM();
         showToast('تمت استعادة البيانات الافتراضية لـ 49 مدرسة ومركزاً', '🔄');
+      });
+
+      // Mark a follow-up as done from the school's timeline
+      document.getElementById('interactionsList').addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-fu-done]');
+        if (!btn) return;
+        btn.disabled = true;
+        try {
+          await CRMDB.completeFollowUp(Number(btn.getAttribute('data-fu-done')), true);
+          await loadInteractions(Number(document.getElementById('editSchoolId').value));
+          if (typeof window.refreshFollowUps === 'function') window.refreshFollowUps();
+          showToast('تم تسجيل المتابعة كمنجزة', '✅');
+        } catch (err) {
+          btn.disabled = false;
+          showToast('تعذر التحديث: ' + err.message, '⚠️');
+        }
       });
 
       // Add interaction (cloud mode)
