@@ -117,7 +117,9 @@
   }
 
   function onKey(e) {
-    if (e.key === 'Enter' && current() && !e.target.closest('input, textarea, select')) {
+    const t = e.target;
+    const typing = t && typeof t.closest === 'function' && t.closest('input, textarea, select');
+    if (e.key === 'Enter' && current() && !typing) {
       e.preventDefault();
       advance(true);
     } else if (e.key === 'Escape') {
