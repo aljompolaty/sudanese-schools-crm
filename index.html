@@ -2203,6 +2203,7 @@ https://aljompolaty.github.io/science-grade9-game/
       const queueContainer = document.getElementById('campaignQueueList');
       queueContainer.innerHTML = '';
 
+      if (typeof window.updateBulkCounts === 'function') window.updateBulkCounts();
       if (selectedSchools.length === 0) {
         queueContainer.innerHTML = `
           <div class="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-500 text-xs">
@@ -2244,6 +2245,7 @@ https://aljompolaty.github.io/science-grade9-game/
         `;
         queueContainer.appendChild(item);
       });
+      if (typeof window.updateBulkCounts === 'function') window.updateBulkCounts();
     }
 
     // CHARTS INITIALIZATION & UPDATE
