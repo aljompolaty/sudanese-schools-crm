@@ -177,7 +177,7 @@
           subject: buildPersonalizedSubject(s),
           text: buildPersonalizedMessage(s)
         })),
-        video: videoUrl ? { url: videoUrl, thumb: new URL('promo/promo-thumb.jpg', location.href).href } : null
+        video: videoUrl ? { url: videoUrl, thumb } : null
       });
       const ok = (res.results || []).filter((r) => r.ok);
       const failed = (res.results || []).filter((r) => !r.ok);
