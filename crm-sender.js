@@ -199,7 +199,7 @@
       );
     } catch (err) {
       if (err.notDeployed) {
-        alert('خدمة إرسال البريد غير مفعّلة بعد.\n\nاتبع خطوات «إرسال البريد الجماعي» في ملف supabase/SETUP.md لتفعيل الدالة send-campaign-email وربط حساب Brevo.');
+        alert('خدمة إرسال البريد غير مفعّلة بعد.\n\nاتبع خطوات «إرسال البريد الجماعي من Gmail» في ملف supabase/SETUP.md لتفعيل الدالة send-campaign-email وربط بريدك.');
       } else {
         showToast('تعذر إرسال البريد: ' + err.message, '⚠️');
       }

@@ -37,25 +37,43 @@
 ## تحديث المرحلة الثالثة: رابط الفيديو في الحملة
 شغّل `phase3.sql` مرة واحدة في **SQL Editor** (يضيف عمود `video_url` للحملات). آمن لإعادة التشغيل.
 
-## إرسال البريد الجماعي (Brevo)
-زر «✉️ إرسال بريد للجميع» يرسل عبر دالة على Supabase اسمها `send-campaign-email`. مرة واحدة فقط:
+## إرسال البريد الجماعي من Gmail الخاص بك
+زر «✉️ إرسال بريد للجميع» يرسل الرسائل **من بريدك على Gmail**: تظهر في «البريد المرسل»، والردود تصل لصندوقك.
+الإعداد مرة واحدة فقط (حوالي 10 دقائق):
 
-1. **حساب Brevo:** أنشئ حساباً مجانياً على https://www.brevo.com
-   - **Senders, Domains & Dedicated IPs → Senders → Add a sender**: أضف البريد الذي سترسل منه وأكّده من الرسالة التي تصلك.
-   - **SMTP & API → API Keys → Generate a new API key**: انسخ المفتاح (يظهر مرة واحدة).
-2. **إنشاء الدالة في Supabase:** **Edge Functions → Deploy a new function → Via Editor**
+### أ) سكربت Gmail
+1. افتح https://script.google.com وأنت مسجّل بحساب Gmail الذي سترسل منه ← **New project** (مشروع جديد).
+2. احذف الكود الموجود والصق محتوى الملف `gmail-sender/Code.gs` ← احفظ (Ctrl/Cmd + S). سمِّ المشروع مثلاً `CRM Gmail Sender`.
+3. من القائمة أعلى المحرر اختر الدالة **`setup`** ← **Run** (تشغيل).
+   - ستطلب Google الإذن: **Review permissions** ← اختر حسابك.
+   - ستظهر رسالة «Google hasn't verified this app» لأن السكربت خاص بك: **Advanced** ← **Go to CRM Gmail Sender (unsafe)** ← **Allow**.
+     الإذن المطلوب هو «إرسال بريد باسمك» فقط؛ السكربت لا يستطيع قراءة بريدك.
+4. أسفل المحرر في **Execution log** سيظهر سطر `GMAIL_SCRIPT_SECRET = ...` ← انسخ القيمة (بدون المسافات).
+5. **Deploy** ← **New deployment** ← رمز الترس ⚙️ ← **Web app**:
+   - **Execute as:** Me (بريدك)
+   - **Who has access:** Anyone
+   - ← **Deploy** ← انسخ **Web app URL** (ينتهي بـ `/exec`).
+
+> «Anyone» لا يعني أن أي شخص يستطيع الإرسال: السكربت يرفض أي طلب لا يحمل المفتاح السري، والمفتاح محفوظ في Supabase فقط.
+
+### ب) دالة الإرسال في Supabase
+1. **Edge Functions ← Deploy a new function ← Via Editor**
    - الاسم بالضبط: `send-campaign-email`
-   - احذف الكود الافتراضي والصق محتوى `supabase/functions/send-campaign-email/index.ts` ثم **Deploy**.
-3. **الأسرار:** **Edge Functions → Secrets → Add new secret** وأضف:
+   - احذف الكود الافتراضي والصق محتوى `supabase/functions/send-campaign-email/index.ts` ← **Deploy**.
+2. **Edge Functions ← Secrets ← Add new secret**:
    | الاسم | القيمة |
    |---|---|
-   | `BREVO_API_KEY` | مفتاح Brevo |
-   | `SENDER_EMAIL` | البريد الذي أكّدته في Brevo |
-   | `SENDER_NAME` | `Experience Media` |
+   | `GMAIL_SCRIPT_URL` | رابط Web app من الخطوة أ-5 |
+   | `GMAIL_SCRIPT_SECRET` | المفتاح من الخطوة أ-4 |
+   | `SENDER_NAME` | `Experience Media` (الاسم الذي يظهر للمستلم) |
 
-مفتاح Brevo يبقى في الخادم فقط ولا يظهر في الصفحة. الدالة تقرأ بريد كل مدرسة من القاعدة، ولا ترسل إلا لمن سجّل دخوله من فريق العمل.
+### حدود ونصائح
+- حساب Gmail العادي يرسل بهذه الطريقة حوالي **100 رسالة يومياً**. إذا تجاوزت الحد تظهر رسالة «أكمل غداً» وتبقى المدارس المتبقية «لم تُرسل» في الحملة.
+- إذا عدّلت السكربت لاحقاً: **Deploy ← Manage deployments ← ✏️ ← Version: New version ← Deploy** (الرابط لا يتغير).
+- إذا تسرّب المفتاح السري: شغّل الدالة `rotateSecret` في السكربت وضع المفتاح الجديد في `GMAIL_SCRIPT_SECRET`.
 
-> للوصول الأفضل إلى صندوق الوارد: الإرسال من بريد على نطاق خاص بك (مثل `info@experience-media.com`) أفضل من Gmail. يمكن إضافة النطاق لاحقاً من Brevo → Domains.
+### بديل: Brevo
+بدلاً من Gmail يمكن استخدام Brevo بإضافة الأسرار `BREVO_API_KEY` و `SENDER_EMAIL` و `SENDER_NAME` (دون أسرار Gmail). إذا وُجدت أسرار Gmail تُستخدم هي أولاً.
 
 ## ما الذي يُحفظ
 | الجدول | المحتوى |
