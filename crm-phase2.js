@@ -322,7 +322,8 @@
     activeId = readActive();
     updateNewCampaignCount();
     document.body.addEventListener('change', (e) => {
-      if (e.target.closest('[data-action="toggle-select"]')) updateNewCampaignCount();
+      // Defer: the main page's handler updates `selected` after this listener runs
+      if (e.target.closest('[data-action="toggle-select"]')) setTimeout(updateNewCampaignCount, 0);
     });
     ['btnSelectAllWhatsappSchools', 'btnClearSelection', 'selectAllVisible'].forEach((id) => {
       const el = $(id);
