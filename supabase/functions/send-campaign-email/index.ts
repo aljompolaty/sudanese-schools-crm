@@ -78,46 +78,95 @@ Deno.serve(async (req) => {
   if (schoolsErr) return json({ error: schoolsErr.message }, 500);
   const byId = new Map((schools ?? []).map((s) => [Number(s.id), s]));
 
+  // Build every email first (recipient always comes from the database)
+  type Outgoing = { school_id: number; name: string; to: string; subject: string; text: string; html: string };
   const results: { school_id: number; ok: boolean; error?: string }[] = [];
+  const outgoing: Outgoing[] = [];
   for (const m of messages) {
     const school = byId.get(Number(m.school_id));
     const to = String(school?.email ?? '').trim();
     if (!school || !/^\S+@\S+\.\S+$/.test(to)) {
-      results.push({ school_id: m.school_id, ok: false, error: 'لا يوجد بريد صالح' });
+      results.push({ school_id: Number(m.school_id), ok: false, error: 'لا يوجد بريد صالح' });
       continue;
     }
-    const subject = String(m.subject || '').slice(0, 250) || 'Experience Media';
+    const subject = String(m.subject || '').slice(0, 250) || senderName;
     const text = String(m.text || '').slice(0, 20000);
-    try {
-      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          sender: { email: senderEmail, name: senderName },
-          to: [{ email: to, name: school.name }],
-          subject,
-          htmlContent: toHtml(text, video),
-          textContent: text + (video ? `\n\n▶️ ${video.url}` : '')
-        })
-      });
-      if (!res.ok) {
-        const detail = await res.text();
-        results.push({ school_id: school.id, ok: false, error: `Brevo ${res.status}: ${detail.slice(0, 200)}` });
-        continue;
-      }
-      results.push({ school_id: school.id, ok: true });
-      await supabase.from('interactions').insert({
-        school_id: school.id, type: 'email', direction: 'out', summary: `إرسال بريد الحملة: ${subject}`
-      });
-      if (campaignId) {
-        await supabase.from('campaign_targets').update({ status: 'sent' })
-          .eq('campaign_id', campaignId).eq('school_id', school.id).eq('status', 'pending');
-      }
-    } catch (e) {
-      results.push({ school_id: school.id, ok: false, error: String(e).slice(0, 200) });
-    }
-    await new Promise((r) => setTimeout(r, 120)); // stay well under Brevo's rate limit
+    outgoing.push({
+      school_id: Number(school.id), name: school.name, to, subject,
+      text: text + (video ? `\n\n▶️ ${video.url}` : ''),
+      html: toHtml(text, video)
+    });
   }
 
-  return json({ sent: results.filter((r) => r.ok).length, results });
+  const sentOk: Outgoing[] = [];
+  if (provider === 'gmail') {
+    // One call to the Apps Script web app; it sends from the owner's Gmail
+    try {
+      const res = await fetch(gmailUrl!, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: gmailSecret,
+          sender_name: senderName,
+          messages: outgoing.map((o) => ({ id: o.school_id, to: o.to, subject: o.subject, text: o.text, html: o.html }))
+        }),
+        redirect: 'follow'
+      });
+      const raw = await res.text();
+      let out: { ok?: boolean; error?: string; results?: { id: number; ok: boolean; error?: string }[] } = {};
+      try { out = JSON.parse(raw); } catch { out = { ok: false, error: `Gmail script ${res.status}: ${raw.slice(0, 160)}` }; }
+      if (!out.ok) {
+        const err = out.error === 'unauthorized' ? 'المفتاح السري لسكربت Gmail غير مطابق (GMAIL_SCRIPT_SECRET)' : (out.error || 'فشل سكربت Gmail');
+        outgoing.forEach((o) => results.push({ school_id: o.school_id, ok: false, error: err }));
+      } else {
+        const byResult = new Map((out.results ?? []).map((r) => [Number(r.id), r]));
+        for (const o of outgoing) {
+          const r = byResult.get(o.school_id);
+          if (r?.ok) { sentOk.push(o); results.push({ school_id: o.school_id, ok: true }); }
+          else results.push({ school_id: o.school_id, ok: false, error: r?.error || 'لم يُرسل' });
+        }
+      }
+    } catch (e) {
+      outgoing.forEach((o) => results.push({ school_id: o.school_id, ok: false, error: String(e).slice(0, 200) }));
+    }
+  } else {
+    for (const o of outgoing) {
+      try {
+        const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: { 'api-key': brevoKey!, 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            sender: { email: senderEmail, name: senderName },
+            to: [{ email: o.to, name: o.name }],
+            subject: o.subject,
+            htmlContent: o.html,
+            textContent: o.text
+          })
+        });
+        if (!res.ok) {
+          results.push({ school_id: o.school_id, ok: false, error: `Brevo ${res.status}: ${(await res.text()).slice(0, 200)}` });
+        } else {
+          sentOk.push(o);
+          results.push({ school_id: o.school_id, ok: true });
+        }
+      } catch (e) {
+        results.push({ school_id: o.school_id, ok: false, error: String(e).slice(0, 200) });
+      }
+      await new Promise((r) => setTimeout(r, 120)); // stay well under Brevo's rate limit
+    }
+  }
+
+  // Record what was actually sent
+  for (const o of sentOk) {
+    await supabase.from('interactions').insert({
+      school_id: o.school_id, type: 'email', direction: 'out',
+      summary: `إرسال بريد الحملة (${provider === 'gmail' ? 'Gmail' : 'Brevo'}): ${o.subject}`
+    });
+    if (campaignId) {
+      await supabase.from('campaign_targets').update({ status: 'sent' })
+        .eq('campaign_id', campaignId).eq('school_id', o.school_id).eq('status', 'pending');
+    }
+  }
+
+  return json({ provider, sent: sentOk.length, results });
 });
