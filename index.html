@@ -1670,7 +1670,21 @@ https://aljompolaty.github.io/science-grade9-game/
     let zoneChartInstance = null;
     let statusChartInstance = null;
 
-    function loadState() {
+    const CLOUD = Boolean(window.CRMDB && window.CRMDB.enabled);
+
+    function escapeHtml(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    async function loadState() {
+      if (CLOUD) {
+        const defaults = {};
+        INITIAL_SCHOOLS.forEach(s => { defaults[s.id] = Boolean(s.selected); });
+        schoolsData = await CRMDB.fetchSchools(defaults);
+        return;
+      }
       try {
         const saved = localStorage.getItem('sudanese_schools_crm_v1');
         if (saved) {
@@ -1684,6 +1698,10 @@ https://aljompolaty.github.io/science-grade9-game/
     }
 
     function saveState() {
+      if (CLOUD) {
+        CRMDB.syncSchools(schoolsData);
+        return;
+      }
       try {
         localStorage.setItem('sudanese_schools_crm_v1', JSON.stringify(schoolsData));
       } catch (e) {
@@ -2162,6 +2180,15 @@ https://aljompolaty.github.io/science-grade9-game/
       document.getElementById('formStages').value = school.stages || '';
       document.getElementById('formNotes').value = school.notes || '';
 
+      const intSection = document.getElementById('interactionsSection');
+      if (CLOUD) {
+        intSection.classList.remove('hidden');
+        document.getElementById('interactionForm').reset();
+        loadInteractions(school.id);
+      } else {
+        intSection.classList.add('hidden');
+      }
+
       const modal = document.getElementById('schoolModal');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -2171,6 +2198,7 @@ https://aljompolaty.github.io/science-grade9-game/
       document.getElementById('modalTitle').textContent = 'إضافة مدرسة أو عميل جديد لقاعدة البيانات';
       document.getElementById('editSchoolId').value = '';
       document.getElementById('schoolForm').reset();
+      document.getElementById('interactionsSection').classList.add('hidden');
       const modal = document.getElementById('schoolModal');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -2182,9 +2210,120 @@ https://aljompolaty.github.io/science-grade9-game/
       modal.classList.remove('flex');
     }
 
+    // INTERACTIONS TIMELINE (cloud mode)
+    const INTERACTION_TYPES = {
+      note: '📝 ملاحظة', call: '📞 مكالمة', whatsapp: '💬 واتساب', email: '✉️ بريد',
+      visit: '🏫 زيارة', meeting: '🤝 اجتماع', status_change: '📌 تغيير الحالة', other: '• أخرى'
+    };
+
+    async function loadInteractions(schoolId) {
+      const list = document.getElementById('interactionsList');
+      list.innerHTML = '<div class="text-slate-400">⏳ جاري تحميل السجل...</div>';
+      try {
+        const rows = await CRMDB.listInteractions(schoolId);
+        if (String(document.getElementById('editSchoolId').value) !== String(schoolId)) return;
+        if (!rows.length) {
+          list.innerHTML = '<div class="text-slate-400">لا توجد مراسلات أو ملاحظات مسجلة بعد.</div>';
+          return;
+        }
+        list.innerHTML = rows.map(r => {
+          const when = new Date(r.created_at).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
+          const dir = r.direction === 'in' ? ' • وارد' : (r.direction === 'out' ? ' • صادر' : '');
+          const follow = r.next_follow_up
+            ? `<div class="mt-1 text-amber-700 font-semibold">⏰ متابعة: ${escapeHtml(r.next_follow_up)}</div>` : '';
+          const outcome = r.outcome ? `<div class="mt-1 text-slate-600">النتيجة: ${escapeHtml(r.outcome)}</div>` : '';
+          const isStatus = r.type === 'status_change';
+          return `<div class="rounded-lg border ${isStatus ? 'border-slate-200 bg-slate-50' : 'border-indigo-100 bg-white'} p-2.5">
+            <div class="flex flex-wrap justify-between gap-1 text-[11px] text-slate-500">
+              <span class="font-bold text-slate-700">${INTERACTION_TYPES[r.type] || escapeHtml(r.type)}${dir}</span>
+              <span>${escapeHtml(when)} — <span class="font-mono" dir="ltr">${escapeHtml(r.created_by)}</span></span>
+            </div>
+            <div class="mt-1 whitespace-pre-wrap text-slate-900">${escapeHtml(r.summary)}</div>${outcome}${follow}
+          </div>`;
+        }).join('');
+      } catch (err) {
+        list.innerHTML = `<div class="text-rose-600">تعذر تحميل السجل: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    // AUTH GATE (cloud mode): resolves once a team member is signed in
+    async function ensureSignedIn() {
+      if (!CLOUD) return null;
+      const overlay = document.getElementById('loginOverlay');
+      const errBox = document.getElementById('loginError');
+      const showError = (msg) => { errBox.textContent = msg; errBox.classList.remove('hidden'); };
+
+      let session = await CRMDB.getSession();
+      while (true) {
+        if (session) {
+          try {
+            const members = await CRMDB.checkMembership();
+            if (members) {
+              overlay.classList.add('hidden');
+              overlay.classList.remove('flex');
+              return session;
+            }
+            await CRMDB.signOut();
+            showError('هذا الحساب غير مضاف إلى فريق العمل. اطلب من المدير إضافته.');
+          } catch (e) {
+            showError('تعذر الاتصال بقاعدة البيانات: ' + e.message);
+          }
+        }
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+        session = await new Promise(resolve => {
+          const form = document.getElementById('loginForm');
+          const onSubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btnLogin');
+            btn.disabled = true;
+            errBox.classList.add('hidden');
+            try {
+              const s = await CRMDB.signIn(
+                document.getElementById('loginEmail').value,
+                document.getElementById('loginPassword').value
+              );
+              form.removeEventListener('submit', onSubmit);
+              document.getElementById('loginPassword').value = '';
+              resolve(s);
+            } catch (err) {
+              showError(err.message === 'Invalid login credentials' ? 'البريد أو كلمة المرور غير صحيحة' : err.message);
+            } finally {
+              btn.disabled = false;
+            }
+          };
+          form.addEventListener('submit', onSubmit);
+        });
+      }
+    }
+
     // INITIALIZE APP & EVENT LISTENERS
-    window.addEventListener('DOMContentLoaded', () => {
-      loadState();
+    window.addEventListener('DOMContentLoaded', async () => {
+      if (CLOUD) {
+        CRMDB.setHandlers({
+          onError: (msg) => showToast(msg, '⚠️'),
+          onIdsChanged: () => renderCRM()
+        });
+        const session = await ensureSignedIn();
+        document.getElementById('dbModeBadge').classList.add('hidden');
+        document.getElementById('authEmail').textContent = session.user.email;
+        const badge = document.getElementById('authBadge');
+        badge.classList.remove('hidden');
+        badge.classList.add('flex');
+        document.getElementById('btnSignOut').addEventListener('click', async () => {
+          await CRMDB.signOut();
+          location.reload();
+        });
+        const resetBtn = document.getElementById('btnResetData');
+        resetBtn.textContent = '🔄 تحديث من القاعدة';
+        resetBtn.title = 'إعادة تحميل أحدث البيانات من قاعدة البيانات المشتركة';
+      }
+      try {
+        await loadState();
+      } catch (err) {
+        showToast('تعذر تحميل البيانات: ' + err.message, '⚠️');
+        schoolsData = [];
+      }
 
       // Load default template (Auto Smart Sudanese Curriculum Apps Campaign)
       const defTpl = CAMPAIGN_TEMPLATES.auto_smart;
@@ -2289,6 +2428,7 @@ https://aljompolaty.github.io/science-grade9-game/
             saveState();
             renderCRM();
           }
+          if (CLOUD) CRMDB.logInteraction({ school_id: school.id, type: 'whatsapp', direction: 'out', summary: 'فتح محادثة واتساب برسالة الحملة الترويجية' });
           showToast(`تم فتح محادثة واتساب لـ ${school.name} وتحديث حالتها`, '💬');
         } else if (action === 'email') {
           const sub = buildPersonalizedSubject(school);
@@ -2300,6 +2440,7 @@ https://aljompolaty.github.io/science-grade9-game/
             saveState();
             renderCRM();
           }
+          if (CLOUD) CRMDB.logInteraction({ school_id: school.id, type: 'email', direction: 'out', summary: 'تجهيز بريد إلكتروني برسالة الحملة الترويجية' });
           showToast(`تم تجهيز البريد الإلكتروني لـ ${school.name}`, '✉️');
         } else if (action === 'copy-msg') {
           const msg = buildPersonalizedMessage(school);
@@ -2384,11 +2525,50 @@ https://aljompolaty.github.io/science-grade9-game/
       document.getElementById('btnCloseModal').addEventListener('click', closeModal);
       document.getElementById('btnCancelModal').addEventListener('click', closeModal);
 
-      document.getElementById('btnResetData').addEventListener('click', () => {
+      document.getElementById('btnResetData').addEventListener('click', async () => {
+        if (CLOUD) {
+          try {
+            await CRMDB.syncSchools(schoolsData);
+            await loadState();
+            renderCRM();
+            showToast('تم تحميل أحدث البيانات من قاعدة البيانات', '🔄');
+          } catch (err) {
+            showToast('تعذر التحديث: ' + err.message, '⚠️');
+          }
+          return;
+        }
+        if (!confirm('سيتم حذف كل تعديلاتك المحلية واستعادة البيانات الافتراضية. متابعة؟')) return;
         schoolsData = JSON.parse(JSON.stringify(INITIAL_SCHOOLS));
         saveState();
         renderCRM();
         showToast('تمت استعادة البيانات الافتراضية لـ 49 مدرسة ومركزاً', '🔄');
+      });
+
+      // Add interaction (cloud mode)
+      document.getElementById('interactionForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const schoolId = Number(document.getElementById('editSchoolId').value);
+        const summary = document.getElementById('intSummary').value.trim();
+        if (!schoolId || !summary) return;
+        const btn = document.getElementById('btnAddInteraction');
+        btn.disabled = true;
+        try {
+          await CRMDB.addInteraction({
+            school_id: schoolId,
+            type: document.getElementById('intType').value,
+            direction: document.getElementById('intDirection').value,
+            summary,
+            outcome: document.getElementById('intOutcome').value.trim(),
+            next_follow_up: document.getElementById('intFollowUp').value
+          });
+          document.getElementById('interactionForm').reset();
+          await loadInteractions(schoolId);
+          showToast('تمت إضافة السجل', '🗒️');
+        } catch (err) {
+          showToast('تعذر إضافة السجل: ' + err.message, '⚠️');
+        } finally {
+          btn.disabled = false;
+        }
       });
 
       // Form Submit (Edit or Add)
