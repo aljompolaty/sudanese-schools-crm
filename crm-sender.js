@@ -177,15 +177,12 @@
       });
       const ok = (res.results || []).filter((r) => r.ok);
       const failed = (res.results || []).filter((r) => !r.ok);
-      // Server already updated the database; mirror it locally
+      // The server logged the emails and updated the campaign; move the sales stage here like WhatsApp does
       ok.forEach((r) => {
         const s = schoolsData.find((x) => x.id === Number(r.school_id));
         if (s && s.status === 'لم يتم التواصل') s.status = 'تم إرسال عرض';
       });
-      if (CLOUD) {
-        await CRMDB.syncSchools(schoolsData);
-        schoolsData = await CRMDB.fetchSchools();
-      }
+      saveState();
       renderCRM();
       if (camp && document.getElementById('activeCampaignSelect')) {
         document.getElementById('activeCampaignSelect').dispatchEvent(new Event('change'));
