@@ -10,6 +10,7 @@
   <script src="config.js"></script>
   <script src="crm-db.js"></script>
   <script src="crm-phase2.js" defer></script>
+  <script src="crm-sender.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body {
@@ -404,6 +405,18 @@
             </div>
           </div>
 
+          <div class="rounded-xl border border-sky-200 bg-sky-50/60 p-3 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <label for="videoUrlInput" class="text-xs font-bold text-slate-800">🎬 رابط الفيديو الترويجي (يظهر في واتساب كمعاينة بصورة الفيديو):</label>
+              <a href="promo/" target="_blank" rel="noopener" class="text-[11px] font-bold text-sky-700 underline">معاينة صفحة الفيديو ↗</a>
+            </div>
+            <input id="videoUrlInput" type="url" dir="ltr" value="https://aljompolaty.github.io/sudanese-schools-crm/promo/" class="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs sm:text-sm text-slate-900 focus:bg-white focus:border-emerald-500 focus:outline-none font-mono">
+            <label class="flex items-center gap-2 text-[11px] text-slate-700 cursor-pointer">
+              <input id="videoAutoAppend" type="checkbox" checked class="rounded border-slate-300 text-sky-600 w-4 h-4">
+              <span>إضافة الرابط تلقائياً في آخر الرسالة إذا لم يكن المتغير {رابط_الفيديو} موجوداً في النص</span>
+            </label>
+          </div>
+
           <div>
             <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
               <label class="text-xs font-bold text-slate-700">نص الخطاب التسويقي (يتغير تلقائياً لكل مدرسة عند تفعيل «التخصيص الذكي»):</label>
@@ -413,6 +426,7 @@
                 <button type="button" data-var="{المراحل}" class="insert-var-btn px-2 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-mono">+ {المراحل}</button>
                 <button type="button" data-var="{فقرة_مخصصة}" class="insert-var-btn px-2 py-0.5 text-xs bg-emerald-100 hover:bg-emerald-200 rounded text-emerald-900 font-mono font-bold">+ {فقرة_مخصصة}</button>
                 <button type="button" data-var="{المرسل}" class="insert-var-btn px-2 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-mono">+ {المرسل}</button>
+                <button type="button" data-var="{رابط_الفيديو}" class="insert-var-btn px-2 py-0.5 text-xs bg-sky-100 hover:bg-sky-200 rounded text-sky-900 font-mono font-bold">+ {رابط_الفيديو}</button>
                 <button type="button" data-var="{هاتف_المرسل}" class="insert-var-btn px-2 py-0.5 text-xs bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-mono">+ {هاتف_المرسل}</button>
               </div>
             </div>
@@ -456,6 +470,22 @@
               <button id="btnClearSelection" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition">
                 ✖ إلغاء تحديد الكل
               </button>
+            </div>
+
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 space-y-2.5">
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="font-bold text-slate-800">فتح واتساب في:</span>
+                <select id="waModeSelect" class="rounded-lg border border-slate-300 px-2 py-1.5 bg-white text-xs">
+                  <option value="desktop">🖥️ تطبيق واتساب على الكمبيوتر</option>
+                  <option value="web">🌐 واتساب ويب (تبويب واحد)</option>
+                  <option value="wa.me">📱 رابط wa.me (للجوال)</option>
+                </select>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button type="button" id="btnBulkWhatsapp" class="px-3 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-sm">▶️ إرسال واتساب للجميع (<span id="bulkWaCount">0</span>)</button>
+                <button type="button" id="btnBulkEmail" class="px-3 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-sm">✉️ إرسال بريد للجميع (<span id="bulkEmailCount">0</span>)</button>
+              </div>
+              <p id="bulkScopeNote" class="text-[11px] text-slate-600 leading-relaxed"></p>
             </div>
 
             <div id="campaignQueueList" class="space-y-2 max-h-[420px] overflow-y-auto pr-1">
@@ -646,6 +676,31 @@
     </section>
 
   </main>
+
+  <!-- Sequential WhatsApp sender -->
+  <div id="waRunner" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-lg w-full p-5 space-y-3 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="text-base font-bold text-slate-900">💬 إرسال واتساب متتابع</h3>
+        <span id="waRunnerCounter" class="text-xs font-bold text-slate-600 bg-slate-100 rounded-full px-2.5 py-1">0 / 0</span>
+      </div>
+      <div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div id="waRunnerBar" class="h-full bg-emerald-500 transition-all" style="width:0%"></div></div>
+      <div id="waRunnerBody" class="space-y-2"></div>
+      <label class="flex items-center gap-2 text-[11px] text-slate-600 cursor-pointer">
+        <input id="waRunnerAutoOpen" type="checkbox" checked class="rounded border-slate-300 text-emerald-600 w-4 h-4">
+        <span>فتح محادثة المدرسة التالية مباشرة بعد الضغط على «أُرسلت»</span>
+      </label>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" id="waRunnerOpen" class="col-span-2 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">💬 فتح المحادثة</button>
+        <button type="button" id="waRunnerSent" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm">✔ أُرسلت — التالي <kbd class="text-[10px] opacity-75">Enter</kbd></button>
+        <button type="button" id="waRunnerSkip" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm">⏭️ تخطي</button>
+      </div>
+      <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+        <p class="text-[11px] text-slate-500">اضغط «إرسال» داخل واتساب، ثم ارجع هنا واضغط «أُرسلت».</p>
+        <button type="button" id="waRunnerStop" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold">⏹ إيقاف</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Login Overlay (cloud mode) -->
   <div id="loginOverlay" class="fixed inset-0 bg-slate-900 z-[60] hidden items-center justify-center p-4">
@@ -1887,7 +1942,13 @@ https://aljompolaty.github.io/science-grade9-game/
       const sender = document.getElementById('senderNameInput').value || 'شركة Experience Media — مبادرة تطبيقات المنهج السوداني الذكية';
       const senderPhone = document.getElementById('senderPhoneInput').value || 'مصر: +20 114 787 5068 | السودان: +249 123 138 020';
       const customPara = getSchoolCustomPitchParagraph(school);
-      return rawBody
+      const videoUrl = getCampaignVideoUrl();
+      let body = rawBody;
+      if (videoUrl && !body.includes('{رابط_الفيديو}') && document.getElementById('videoAutoAppend').checked) {
+        body = body.replace(/\s+$/, '') + '\n\n🎬 شاهدوا الفيديو التعريفي (35 ثانية):\n{رابط_الفيديو}';
+      }
+      return body
+        .replace(/\{رابط_الفيديو\}/g, videoUrl)
         .replace(/\{اسم_المدرسة\}/g, school.name)
         .replace(/\{المنطقة\}/g, school.zone)
         .replace(/\{المراحل\}/g, school.stages || 'الابتدائي والمتوسط والثانوي')
@@ -1895,6 +1956,39 @@ https://aljompolaty.github.io/science-grade9-game/
         .replace(/\{فقرة_مخصصة\}/g, customPara)
         .replace(/\{المرسل\}/g, sender)
         .replace(/\{هاتف_المرسل\}/g, senderPhone);
+    }
+
+    function getCampaignVideoUrl() {
+      const el = document.getElementById('videoUrlInput');
+      const v = el ? el.value.trim() : '';
+      return /^https:\/\//i.test(v) ? v : '';
+    }
+
+    // WHATSAPP: open a chat in the desktop app, WhatsApp Web, or wa.me (viewer's choice)
+    const WA_MODE_KEY = 'sudanese_schools_wa_mode_v1';
+    function getWaMode() {
+      try { return localStorage.getItem(WA_MODE_KEY) || 'desktop'; } catch (e) { return 'desktop'; }
+    }
+    function setWaMode(mode) {
+      try { localStorage.setItem(WA_MODE_KEY, mode); } catch (e) { /* ignore */ }
+    }
+    function waPhone(school) {
+      let p = String((school && school.whatsapp) || '').replace(/[^0-9]/g, '');
+      if (p.startsWith('01')) p = '2' + p;
+      return p;
+    }
+    function openWhatsappChat(phone, msg) {
+      const text = encodeURIComponent(msg);
+      const mode = getWaMode();
+      if (mode === 'desktop') {
+        const a = document.createElement('a');
+        a.href = `whatsapp://send?phone=${phone}&text=${text}`;
+        document.body.appendChild(a); a.click(); a.remove();
+      } else if (mode === 'web') {
+        window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${text}`, 'crm_whatsapp');
+      } else {
+        window.open(`https://wa.me/${phone}?text=${text}`, '_blank', 'noopener');
+      }
     }
 
     function buildPersonalizedSubject(school) {
@@ -2109,6 +2203,7 @@ https://aljompolaty.github.io/science-grade9-game/
       const queueContainer = document.getElementById('campaignQueueList');
       queueContainer.innerHTML = '';
 
+      if (typeof window.updateBulkCounts === 'function') window.updateBulkCounts();
       if (selectedSchools.length === 0) {
         queueContainer.innerHTML = `
           <div class="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-500 text-xs">
@@ -2150,6 +2245,7 @@ https://aljompolaty.github.io/science-grade9-game/
         `;
         queueContainer.appendChild(item);
       });
+      if (typeof window.updateBulkCounts === 'function') window.updateBulkCounts();
     }
 
     // CHARTS INITIALIZATION & UPDATE
@@ -2550,11 +2646,7 @@ https://aljompolaty.github.io/science-grade9-game/
         if (!school) return;
 
         if (action === 'wa') {
-          const msg = buildPersonalizedMessage(school);
-          let cleanPhone = (school.whatsapp || '').replace(/[^0-9]/g, '');
-          if (cleanPhone.startsWith('01')) cleanPhone = '2' + cleanPhone;
-          const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
-          const a = document.createElement('a'); a.href = waUrl; a.target = '_blank'; a.rel = 'noopener noreferrer'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          openWhatsappChat(waPhone(school), buildPersonalizedMessage(school));
           if (school.status === 'لم يتم التواصل') {
             school.status = 'تم إرسال عرض';
             saveState();

@@ -34,6 +34,29 @@
 شغّل `phase2.sql` مرة واحدة في **SQL Editor**. يضيف: جداول الحملات، وحالة «تمت المتابعة»، وتحسين سجل التعديلات.
 آمن لإعادة التشغيل. (المشروع الجديد يكفيه `setup-all.sql` لأنه يتضمن كل شيء.)
 
+## تحديث المرحلة الثالثة: رابط الفيديو في الحملة
+شغّل `phase3.sql` مرة واحدة في **SQL Editor** (يضيف عمود `video_url` للحملات). آمن لإعادة التشغيل.
+
+## إرسال البريد الجماعي (Brevo)
+زر «✉️ إرسال بريد للجميع» يرسل عبر دالة على Supabase اسمها `send-campaign-email`. مرة واحدة فقط:
+
+1. **حساب Brevo:** أنشئ حساباً مجانياً على https://www.brevo.com
+   - **Senders, Domains & Dedicated IPs → Senders → Add a sender**: أضف البريد الذي سترسل منه وأكّده من الرسالة التي تصلك.
+   - **SMTP & API → API Keys → Generate a new API key**: انسخ المفتاح (يظهر مرة واحدة).
+2. **إنشاء الدالة في Supabase:** **Edge Functions → Deploy a new function → Via Editor**
+   - الاسم بالضبط: `send-campaign-email`
+   - احذف الكود الافتراضي والصق محتوى `supabase/functions/send-campaign-email/index.ts` ثم **Deploy**.
+3. **الأسرار:** **Edge Functions → Secrets → Add new secret** وأضف:
+   | الاسم | القيمة |
+   |---|---|
+   | `BREVO_API_KEY` | مفتاح Brevo |
+   | `SENDER_EMAIL` | البريد الذي أكّدته في Brevo |
+   | `SENDER_NAME` | `Experience Media` |
+
+مفتاح Brevo يبقى في الخادم فقط ولا يظهر في الصفحة. الدالة تقرأ بريد كل مدرسة من القاعدة، ولا ترسل إلا لمن سجّل دخوله من فريق العمل.
+
+> للوصول الأفضل إلى صندوق الوارد: الإرسال من بريد على نطاق خاص بك (مثل `info@experience-media.com`) أفضل من Gmail. يمكن إضافة النطاق لاحقاً من Brevo → Domains.
+
 ## ما الذي يُحفظ
 | الجدول | المحتوى |
 |---|---|

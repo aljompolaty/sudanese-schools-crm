@@ -169,7 +169,7 @@
   async function listCampaigns() {
     const { data, error } = await client
       .from('campaigns')
-      .select('id, name, channel, subject, body, archived, created_at, created_by, campaign_targets(status)')
+      .select('id, name, channel, subject, body, video_url, archived, created_at, created_by, campaign_targets(status)')
       .eq('archived', false)
       .order('created_at', { ascending: false });
     if (error) throw error;
@@ -181,10 +181,10 @@
     });
   }
 
-  async function createCampaign({ name, channel, subject, body, schoolIds }) {
+  async function createCampaign({ name, channel, subject, body, videoUrl, schoolIds }) {
     const { data, error } = await client
       .from('campaigns')
-      .insert({ name, channel: channel || 'whatsapp', subject: subject || null, body: body || null })
+      .insert({ name, channel: channel || 'whatsapp', subject: subject || null, body: body || null, video_url: videoUrl || null })
       .select('id')
       .single();
     if (error) throw error;
@@ -219,6 +219,24 @@
     if (error) throw error;
   }
 
+  // ---------- Bulk email through the Supabase Edge Function ----------
+  // messages: [{ school_id, subject, text }]; the function looks up each school's email itself.
+  async function sendCampaignEmails({ campaignId, messages, video }) {
+    const { data, error } = await client.functions.invoke('send-campaign-email', {
+      body: { campaign_id: campaignId || null, messages, video: video || null }
+    });
+    if (error) {
+      let detail = error.message;
+      try { const j = await error.context.json(); detail = j.error || detail; } catch (e) { /* not JSON */ }
+      const status = error.context && error.context.status;
+      const err = new Error(detail);
+      err.status = status;
+      err.notDeployed = status === 404 || /Failed to send a request/i.test(error.message);
+      throw err;
+    }
+    return data;
+  }
+
   // ---------- Audit log (admins only; RLS returns nothing to others) ----------
   async function listAudit(limit = 200) {
     const { data, error } = await client
@@ -241,6 +259,7 @@
     listCampaignTargets,
     setTargetStatus,
     listAudit,
+    sendCampaignEmails,
     getSession,
     signIn,
     signOut,

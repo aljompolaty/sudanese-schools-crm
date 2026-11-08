@@ -1,5 +1,5 @@
--- ALL-IN-ONE for a NEW project: schema + 49 schools + phase 2. Paste this whole file in Supabase SQL Editor and press Run.
--- (Existing project already set up? Run only phase2.sql.)
+-- ALL-IN-ONE for a NEW project: schema + 49 schools + phase 2 + phase 3. Paste this whole file in Supabase SQL Editor and press Run.
+-- (Existing project already set up? Run only the phase files you have not run yet.)
 
 -- =====================================================================
 -- Sudanese Schools CRM — Phase 1 database schema (Supabase / PostgreSQL)
@@ -357,3 +357,10 @@ create policy targets_insert on public.campaign_targets for insert to authentica
 create policy targets_update on public.campaign_targets for update to authenticated
   using (public.is_team_member()) with check (public.is_team_member());
 create policy targets_delete on public.campaign_targets for delete to authenticated using (public.is_team_member());
+
+-- =====================================================================
+-- Sudanese Schools CRM — Phase 3 migration: promo video link per campaign
+-- Run once in: Supabase Dashboard → SQL Editor → New query → Run   (safe to re-run)
+-- =====================================================================
+alter table public.campaigns add column if not exists video_url text
+  check (video_url is null or video_url ~* '^https://');

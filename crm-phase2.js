@@ -307,6 +307,11 @@
     }
   }
 
+  // Read-only view of the active campaign for the bulk sender
+  window.getActiveCampaign = function () {
+    return activeId ? { id: activeId, targets } : null;
+  };
+
   // Called by the WhatsApp / email buttons
   window.onCampaignContact = function (schoolId) {
     const t = targets.get(Number(schoolId));
@@ -340,6 +345,7 @@
         if (c.subject) $('emailSubjectInput').value = c.subject;
         if (c.body) $('campaignBodyInput').value = c.body;
       }
+      if (c && c.video_url) $('videoUrlInput').value = c.video_url;
       try { await loadTargets(); } catch (err) { showToast('تعذر تحميل مدارس الحملة: ' + err.message, '⚠️'); }
     });
 
@@ -356,6 +362,7 @@
           channel: $('newCampaignChannel').value,
           subject: $('emailSubjectInput').value,
           body: $('campaignBodyInput').value,
+          videoUrl: getCampaignVideoUrl(),
           schoolIds: schoolsData.filter((s) => s.selected).map((s) => s.id)
         });
         activeId = id;
