@@ -163,11 +163,13 @@
 
     const btn = $('btnBulkEmail');
     btn.disabled = true;
-    const label = btn.innerHTML;
-    btn.textContent = '⏳ جاري الإرسال...';
+    btn.classList.add('opacity-60', 'animate-pulse'); // keep the inner count span intact
+    showToast(`⏳ جاري إرسال ${list.length} رسالة بريد...`, '✉️');
     try {
       await CRMDB.syncSchools(schoolsData);
       const videoUrl = getCampaignVideoUrl();
+      const promoPage = new URL('promo/', location.href).href;
+      const thumb = videoUrl.replace(/\/?$/, '/') === promoPage ? promoPage + 'promo-thumb.jpg' : null;
       const res = await CRMDB.sendCampaignEmails({
         campaignId: camp ? camp.id : null,
         messages: list.map((s) => ({
