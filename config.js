@@ -6,5 +6,5 @@
 // While both are empty the CRM runs in local mode (data saved in this browser only).
 window.CRM_CONFIG = {
   SUPABASE_URL: 'https://crcdvghkyointygnmsyp.supabase.co',
-  SUPABASE_ANON_KEY: ''
+  SUPABASE_ANON_KEY: 'sb_publishable_pW12MYieky1sa8M-N7kNpg_lGtxcu09'
 };
