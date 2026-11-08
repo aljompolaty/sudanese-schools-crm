@@ -51,10 +51,19 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-  const apiKey = Deno.env.get('BREVO_API_KEY');
+  // Provider: your Gmail (Apps Script) when configured, otherwise Brevo
+  const gmailUrl = Deno.env.get('GMAIL_SCRIPT_URL');
+  const gmailSecret = Deno.env.get('GMAIL_SCRIPT_SECRET');
+  const brevoKey = Deno.env.get('BREVO_API_KEY');
   const senderEmail = Deno.env.get('SENDER_EMAIL');
   const senderName = Deno.env.get('SENDER_NAME') || 'Experience Media';
-  if (!apiKey || !senderEmail) return json({ error: 'خدمة البريد غير مهيأة: أضف BREVO_API_KEY و SENDER_EMAIL في أسرار الدالة' }, 500);
+  const provider = gmailUrl && gmailSecret ? 'gmail' : (brevoKey && senderEmail ? 'brevo' : null);
+  if (!provider) {
+    return json({ error: 'خدمة البريد غير مهيأة: أضف GMAIL_SCRIPT_URL و GMAIL_SCRIPT_SECRET (أو BREVO_API_KEY و SENDER_EMAIL) في أسرار الدالة' }, 500);
+  }
+  if (gmailUrl && !/^https:\/\/script\.google(usercontent)?\.com\//.test(gmailUrl)) {
+    return json({ error: 'GMAIL_SCRIPT_URL يجب أن يكون رابط Web app من script.google.com' }, 500);
+  }
 
   // Act as the signed-in user so Row Level Security applies to every read and write
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
