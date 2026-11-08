@@ -1678,6 +1678,11 @@ https://aljompolaty.github.io/science-grade9-game/
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
+    function safeUrl(u) {
+      const v = String(u || '').trim();
+      return /^https?:\/\//i.test(v) ? escapeHtml(v) : '#';
+    }
+
     async function loadState() {
       if (CLOUD) {
         const defaults = {};
@@ -1854,16 +1859,16 @@ https://aljompolaty.github.io/science-grade9-game/
       filtered.forEach(school => {
         // Links HTML
         const linksHtml = (school.links && school.links.length > 0)
-          ? school.links.map(l => `<a href="${l.url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 underline font-medium block mb-1">🔗 ${l.label}</a>`).join('')
+          ? school.links.map(l => `<a href="${safeUrl(l.url)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 underline font-medium block mb-1">🔗 ${escapeHtml(l.label)}</a>`).join('')
           : '<span class="text-xs text-slate-400">لا يوجد رابط مسجل</span>';
 
         // Phones HTML
         const phonesHtml = (school.phones && school.phones.length > 0)
-          ? school.phones.map(p => `<span class="ltr-num font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-slate-800 mr-1 mb-1">${p}</span>`).join('')
+          ? school.phones.map(p => `<span class="ltr-num font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-slate-800 mr-1 mb-1">${escapeHtml(p)}</span>`).join('')
           : '<span class="text-xs text-slate-400">مقر مباشر بدون هاتف معلن</span>';
 
         const emailHtml = school.email
-          ? `<div class="mt-1 text-xs text-indigo-700 font-mono break-all">✉️ ${school.email}</div>`
+          ? `<div class="mt-1 text-xs text-indigo-700 font-mono break-all">✉️ ${escapeHtml(school.email)}</div>`
           : '';
 
         // Action buttons
@@ -1891,13 +1896,13 @@ https://aljompolaty.github.io/science-grade9-game/
             <div class="text-[11px] text-slate-400 font-mono mt-1">${school.id}</div>
           </td>
           <td class="py-3 px-3">
-            <div class="font-bold text-slate-900 text-sm mb-1">${school.name}</div>
+            <div class="font-bold text-slate-900 text-sm mb-1">${escapeHtml(school.name)}</div>
             <div class="mb-1">${getCategoryBadge(school.category)}</div>
-            <div class="text-xs text-slate-500 leading-snug">${school.stages}</div>
+            <div class="text-xs text-slate-500 leading-snug">${escapeHtml(school.stages)}</div>
           </td>
           <td class="py-3 px-3">
-            <span class="inline-block text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded mb-1">📍 ${school.zone}</span>
-            <div class="text-xs text-slate-600 leading-relaxed">${school.address}</div>
+            <span class="inline-block text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded mb-1">📍 ${escapeHtml(school.zone)}</span>
+            <div class="text-xs text-slate-600 leading-relaxed">${escapeHtml(school.address)}</div>
           </td>
           <td class="py-3 px-3">
             <div class="flex flex-wrap">${phonesHtml}</div>
@@ -1915,7 +1920,7 @@ https://aljompolaty.github.io/science-grade9-game/
               <option value="غير مهتم" ${school.status === 'غير مهتم' ? 'selected' : ''}>🔴 غير مهتم</option>
             </select>
             <div class="text-[11px] text-slate-500 bg-slate-50 p-1.5 rounded border border-slate-100 min-h-[28px]">
-              ${school.notes ? `📝 ${school.notes}` : '<span class="text-slate-400">لا توجد ملاحظات</span>'}
+              ${school.notes ? `📝 ${escapeHtml(school.notes)}` : '<span class="text-slate-400">لا توجد ملاحظات</span>'}
             </div>
           </td>
           <td class="py-3 px-3 text-center">
@@ -1936,14 +1941,14 @@ https://aljompolaty.github.io/science-grade9-game/
             <div class="flex items-start justify-between gap-2 mb-2">
               <div class="flex items-center gap-2">
                 <input type="checkbox" data-action="toggle-select" data-id="${school.id}" ${school.selected ? 'checked' : ''} class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer">
-                <h4 class="font-bold text-slate-900 text-sm">${school.id}. ${school.name}</h4>
+                <h4 class="font-bold text-slate-900 text-sm">${school.id}. ${escapeHtml(school.name)}</h4>
               </div>
             </div>
             <div class="flex flex-wrap gap-1.5 mb-2">
               ${getCategoryBadge(school.category)}
-              <span class="inline-block text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">📍 ${school.zone}</span>
+              <span class="inline-block text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">📍 ${escapeHtml(school.zone)}</span>
             </div>
-            <p class="text-xs text-slate-600 mb-2">${school.address}</p>
+            <p class="text-xs text-slate-600 mb-2">${escapeHtml(school.address)}</p>
             <div class="mb-2 flex flex-wrap">${phonesHtml}</div>
             ${emailHtml}
             <div class="mt-2">${linksHtml}</div>
@@ -1978,7 +1983,7 @@ https://aljompolaty.github.io/science-grade9-game/
       const previewSelect = document.getElementById('previewSchoolSelector');
       if (previewSelect) {
         const currentVal = previewSelect.value;
-        previewSelect.innerHTML = schoolsData.map(s => `<option value="${s.id}">${s.id}. ${s.name} (${s.category})</option>`).join('');
+        previewSelect.innerHTML = schoolsData.map(s => `<option value="${s.id}">${s.id}. ${escapeHtml(s.name)} (${escapeHtml(s.category)})</option>`).join('');
         if (currentVal && schoolsData.some(s => String(s.id) === String(currentVal))) {
           previewSelect.value = currentVal;
         } else if (selectedSchools[0]) {
@@ -2010,11 +2015,11 @@ https://aljompolaty.github.io/science-grade9-game/
         item.className = 'p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white transition flex flex-wrap items-center justify-between gap-2';
         item.innerHTML = `
           <div class="max-w-[60%]">
-            <div class="font-bold text-slate-900 text-xs sm:text-sm truncate">${school.id}. ${school.name}</div>
+            <div class="font-bold text-slate-900 text-xs sm:text-sm truncate">${school.id}. ${escapeHtml(school.name)}</div>
             <div class="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-              <span>📍 ${school.zone}</span>
+              <span>📍 ${escapeHtml(school.zone)}</span>
               <span>•</span>
-              <span class="font-semibold">${school.status}</span>
+              <span class="font-semibold">${escapeHtml(school.status)}</span>
             </div>
           </div>
           <div class="flex items-center gap-1.5">
